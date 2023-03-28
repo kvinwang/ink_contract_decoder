@@ -20,8 +20,17 @@
 //! }
 //! ```
 //!
-use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
+use serde::{Deserialize, Deserializer, Serialize};
+
+// Custom deserializer for wasm field
+fn from_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    hex::decode(s.trim_start_matches("0x"))
+        .map_err(|e| serde::de::Error::custom(format!("failed to decode hex string: {}: {}", s, e)))
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InkContract {
@@ -37,8 +46,8 @@ pub struct Source {
     pub hash: String,
     pub language: String,
     pub compiler: String,
-    #[serde(with = "serde_bytes")]
-    pub wasm: ByteBuf,
+    #[serde(deserialize_with = "from_hex")]
+    pub wasm: Vec<u8>,
     pub build_info: BuildInfo,
 }
 
@@ -78,19 +87,19 @@ pub struct Constructor {
     pub docs: Vec<String>,
     pub label: String,
     pub payable: bool,
-    pub return_type: ReturnType,
+    pub return_type: Option<ReturnType>,
     pub selector: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ReturnType {
-    pub display_name: Vec<String>,
+    pub display_name: Option<Vec<String>>,
     pub r#type: u8,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LangError {
-    pub display_name: Vec<String>,
+    pub display_name: Option<Vec<String>>,
     pub r#type: u8,
 }
 
@@ -101,7 +110,7 @@ pub struct Message {
     pub label: String,
     pub mutates: bool,
     pub payable: bool,
-    pub return_type: ReturnType,
+    pub return_type: Option<ReturnType>,
     pub selector: String,
 }
 
